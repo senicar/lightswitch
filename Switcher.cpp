@@ -18,38 +18,32 @@ const int Switcher::pwm[16] = {
 	2200, 2800, 3400, FULL_ON,
 };
 
-/*
- * 0 - Off
- * 1 - White
- * 2 - Red
- * 3 - Green
- * 4 - Blue
- * 5 - Yellow
- * 6 - Orange
- * 7 - Cian
- * 8 - Violet
- * 9 - Pink
- *
- * With rgb values
- * */
+/* -------------------------------------------------------*
+** RGB Values
+** -------------------------------------------------------*/
+
 const int Switcher::states[10][3] = {
-	{0    , 0    , 0   },
-	{4095 , 4095 , 4095},
-	{4095 , 0    , 0   },
-	{0    , 4095 , 0   },
-	{0    , 0    , 4095},
-	{4095 , 4095 , 0   },
-	{4095 , 1500 , 0   },
-	{0    , 4095 , 4095},
-	{2500 , 0    , 4095},
-	{4095 , 0    , 4095},
+	{0    , 0    , 0   }, // 0 - off
+	{4095 , 4095 , 4095}, // 1 - white - dimmer setup
+	{4095 , 0    , 0   }, // 2 - red - setup
+	{0    , 4095 , 0   }, // 3 - green - confirmation
+	{0    , 0    , 4095}, // 4 - blue
+	{4095 , 4095 , 0   }, // 5 - yellow - faved
+	{4095 , 1500 , 0   }, // 6 - orange - add time
+	{0    , 4095 , 4095}, // 7 - cian - IR, network API
+	{2500 , 0    , 4095}, // 8 - violet - fade
+	{4095 , 0    , 4095}, // 9 - pink - region/light actions
 };
+
+
+// TODO : FIXME : to much granularity in intensity control of individual light and region
+// this should be more bind to each other, either control regions or lights
 
 void Switcher::toggle(int l) {
 	if(l >= NUM_LIGHTS)
 		return;
 
-	Serial.println("TOGGLE");
+	if(DEBUG) Serial.println("TOGGLE");
 	if((this->pinData & (1 << l)) == 0) {
 		this->turnOn(l);
 	}
@@ -59,36 +53,55 @@ void Switcher::toggle(int l) {
 }
 
 void Switcher::turnOn(int l) {
-	Serial.println("TURN ON");
+	if(DEBUG) Serial.println("TURN ON");
 	dim(l,FULL_ON);
 }
 
 void Switcher::turnOff(int l) {
+	if(DEBUG) Serial.println("TURN OFF");
 	dim(l,OFF);
+}
+
+void Switcher::favToggle() {
+	if(DEBUG) Serial.println("FAV TOGGLE");
+	if(  pinData > 0 )
+		allOff();
+	else
+		favOn();
 }
 
 void Switcher::favOff() {
 	for(int l=0; l < this->numLights; l++) {
 		if(this->lights[l].fav) {
+			if(DEBUG) Serial.println("FAV OFF");
 			this->dim(l,OFF);
 		}
 	}
+
+	favState = false;
 }
 
 void Switcher::favOn() {
 	for(int l=0; l < this->numLights; l++) {
 		if(this->lights[l].fav) {
+			if(DEBUG) Serial.println("FAV ON");
 			this->dim(l,FULL_ON);
 		}
 	}
+
+	favState = true;
 }
 
 void Switcher::allOn() {
+	if(DEBUG) Serial.println("ALL ON");
 	this->setAll(FULL_ON);
+	favState = true;
 }
 
 void Switcher::allOff() {
+	if(DEBUG) Serial.println("ALL OFF");
 	this->clear();
+	favState = false;
 }
 
 void Switcher::setAll(int intensity) {
@@ -98,22 +111,30 @@ void Switcher::setAll(int intensity) {
 }
 
 void Switcher::clear() {
+	if(DEBUG) Serial.println("CLEAR");
 	//Tlc.clear();
 	for(int l=0; l < NUM_LIGHTS; l++) {
 		dim(l,OFF);
 	}
 	// turn off all 16bits
+	favState = false;
 	this->pinData = 0x00;
 }
 
 void Switcher::toggleRegion(int r) {
-	for(int l=0; l < numLights; l++) {
-		if(lights[l].region == r)
-			toggle(l);
-	}
+	if(DEBUG) Serial.print("TOGGLE REGION : ");
+	if(DEBUG) Serial.println(r);
+	if(regions[r].intensity > 0)
+		turnOffRegion(r);
+	else
+		turnOnRegion(r);
 }
 
 void Switcher::turnOffRegion(int r) {
+	if(DEBUG) Serial.print("TURN OFF REGION : ");
+	if(DEBUG) Serial.println(r);
+
+	regions[r].intensity = OFF;
 	for(int l=0; l < numLights; l++) {
 		if(lights[l].region == r)
 			turnOff(l);
@@ -121,6 +142,10 @@ void Switcher::turnOffRegion(int r) {
 }
 
 void Switcher::turnOnRegion(int r) {
+	if(DEBUG) Serial.print("TURN ON REGION : ");
+	if(DEBUG) Serial.println(r);
+
+	regions[r].intensity = FULL_ON;
 	for(int l=0; l < numLights; l++) {
 		if(lights[l].region == r)
 			turnOn(l);
@@ -128,6 +153,10 @@ void Switcher::turnOnRegion(int r) {
 }
 
 void Switcher::dimRegion(int r, int intensity) {
+	if(DEBUG) Serial.print("DIM REGION : ");
+	if(DEBUG) Serial.println(r);
+
+	regions[r].intensity = intensity;
 	for(int l=0; l < numLights; l++) {
 		if(lights[l].region == r)
 			dim(l,intensity);
@@ -135,6 +164,10 @@ void Switcher::dimRegion(int r, int intensity) {
 }
 
 void Switcher::dimRegion(int r, int intensity, unsigned dur) {
+	if(DEBUG) Serial.print("DIM REGION DURATION : ");
+	if(DEBUG) Serial.println(r);
+
+	regions[r].intensity = intensity;
 	for(int l=0; l < numLights; l++) {
 		if(lights[l].region == r)
 			dim(l,intensity,dur);
@@ -142,10 +175,15 @@ void Switcher::dimRegion(int r, int intensity, unsigned dur) {
 }
 
 void Switcher::dim(int l, int intensity) {
+	if(DEBUG) Serial.print("DIM : ");
+	if(DEBUG) Serial.println(l);
+
 	dim(l,intensity,0);
 }
 
 void Switcher::dim(int l, int intensity, unsigned dur) {
+	if(DEBUG) Serial.print("DIM DURATION : ");
+	if(DEBUG) Serial.println(l);
 	//if(l >= NUM_LIGHTS) return;
 
 	if(intensity > 0 & intensity < 16) {
@@ -159,12 +197,14 @@ void Switcher::dim(int l, int intensity, unsigned dur) {
 
 	if(intensity == 0) {
 		this->pinData &= ~(1u << l);
-		lights[l].on = false;
+		//lights[l].on = false;
 	}
 	else {
 		this->pinData |= (1u << l);
-		lights[l].on = true;
+		//lights[l].on = true;
 	}
+
+	lastTimeSwitched = millis();
 }
 
 void Switcher::dimmer(int r) {
@@ -173,7 +213,8 @@ void Switcher::dimmer(int r) {
 	Serial.println("DIMMER START");
 
 	bool dimmerActive = true;
-	Gest.reset();
+
+	//Gest.reset();
 
 	int i = 0;
 	for(int l=0; l < numLights; l++) {
@@ -200,36 +241,40 @@ void Switcher::dimmer(int r) {
 		int level = map(Screen.touchX, 150, 854, 0, pwmNum-1);
 		level = constrain(level, 0, pwmNum-1);
 
-		if(Gest.gestures == "TT") {
-			indicator("dimmer while TT", 3);
-			delay(Gest.tapDelay);
-			dimmerActive = false;
-		}
-/*
-		*/
+		//if(Gest.gestures == "TT") {
+			//indicator("dimmer while TT", 3);
+			//delay(Gest.tapDelay);
+			//dimmerActive = false;
+		//}
 
-		else if(Screen.active & Gest.gestures !="" & (timeDiff > Gest.tapDelay)) {
-			indicator("dimmer while 1", 1, pwm[level]);
+		if(Screen.active & Gest.gestures !="" & (timeDiff > Gest.tapDelay)) {
+			indicator("", 1, pwm[level]);
 			this->dimRegion(r, pwm[level]);
 		}
-/*
-else if (!Screen.active) {
+
+		else if (!Screen.active) {
 			dimmerActive = false;
 		}
-*/
 
 		Tlc.update();
 	}
 
-        Gest.reset();
-	Serial.println("DIMMER STOP");
-	indicator("dimmer stop", 0);
+	// we reset it by hand since we use dimmer mostly in secondary region action
+	// Gest.reset();
+
+	indicator("DIMMER STOP", 0);
 }
 
 void Switcher::animate(anim adata) {
+	// only two buffers
 	for(int a = 0; a < 3; a++) {
 		if(!animBuffer[a].active) {
+			if(DEBUG) Serial.print("ADDED ANIMATION : ");
+			if(DEBUG) Serial.println(a);
+
 			animBuffer[a] = adata;
+			Serial.println(regions[ adata.region ].intensity);
+			animBuffer[a].startIntensity = regions[ adata.region ].intensity;
 			animBuffer[a].endTime = millis() + adata.dur;
 			animBuffer[a].active = true;
 			// data vas saved no need to continue
@@ -317,96 +362,96 @@ void Switcher::animSetRegion(int region) {
 
 			if(Gest.gestures == "R" | Gest.gestures == "HR") {
 				adata.dur = clockInterval;
-				Serial.println(adata.dur/1000);
+				if(DEBUG) Serial.println(adata.dur/1000);
 				Gest.reset();
 			}
 
 			if(Gest.gestures == "Rdr" | Gest.gestures == "HRdr") {
 				adata.dur = clockInterval * 2;
-				Serial.println(adata.dur/1000);
+				if(DEBUG) Serial.println(adata.dur/1000);
 				Gest.reset();
 			}
 
 			if(Gest.gestures == "RdrD" | Gest.gestures == "HRdrD") {
 				adata.dur = clockInterval * 3;
-				Serial.println(adata.dur/1000);
+				if(DEBUG) Serial.println(adata.dur/1000);
 				Gest.reset();
 			}
 
 			if(Gest.gestures == "RdrD" | Gest.gestures == "HRdrD") {
 				adata.dur = clockInterval * 4;
-				Serial.println(adata.dur/1000);
+				if(DEBUG) Serial.println(adata.dur/1000);
 				Gest.reset();
 			}
 
 			if(Gest.gestures == "RdrDdl" | Gest.gestures == "HRdrDdl") {
 				adata.dur = clockInterval * 5;
-				Serial.println(adata.dur/1000);
+				if(DEBUG) Serial.println(adata.dur/1000);
 				Gest.reset();
 			}
 
 			if(Gest.gestures == "RdrDdlL" | Gest.gestures == "HRdrDdlL") {
 				adata.dur = clockInterval * 6;
-				Serial.println(adata.dur/1000);
+				if(DEBUG) Serial.println(adata.dur/1000);
 				Gest.reset();
 			}
 
 			if(Gest.gestures == "RdrDdlLul" | Gest.gestures == "HRdrDdlLul") {
 				adata.dur = clockInterval * 7;
-				Serial.println(adata.dur/1000);
+				if(DEBUG) Serial.println(adata.dur/1000);
 				Gest.reset();
 			}
 
 			if(Gest.gestures == "RdrDdlLulU" | Gest.gestures == "HRdrDdlLulU") {
 				adata.dur = clockInterval * 8;
-				Serial.println(adata.dur/1000);
+				if(DEBUG) Serial.println(adata.dur/1000);
 				Gest.reset();
 			}
 
 			if(Gest.gestures == "RdrDdlLulUur" | Gest.gestures == "HRdrDdlLulUur") {
 				adata.dur = clockInterval * 9;
-				Serial.println(adata.dur/1000);
+				if(DEBUG) Serial.println(adata.dur/1000);
 				Gest.reset();
 			}
 
 			if(Gest.gestures == "RdrDdlLulUurR" | Gest.gestures == "HRdrDdlLulUurR") {
 				adata.dur = clockInterval * 10;
-				Serial.println(adata.dur/1000);
+				if(DEBUG) Serial.println(adata.dur/1000);
 				Gest.reset();
 			}
 
 			if(Gest.gestures == "TT") {
 				indicator("tt", 3);
 				durActive = false;
-				delay(100);
+				delay(Gest.tapDelay);
 				Gest.reset();
 			}
 		}
 	}
 
 	while(fadeActive) {
-		indicator("fade active", 9);
-		Screen.update();
-		Gest.update(Screen.touchX, Screen.touchY, Screen.active);
+	indicator("fade active", 9);
+	Screen.update();
+	Gest.update(Screen.touchX, Screen.touchY, Screen.active);
 
 		if(!Gest.active) {
 
 			if(Gest.gestures == "HR" | Gest.gestures == "R") {
 				adata.fade = true;
-				Serial.println("FADE IN");
+				if(DEBUG) Serial.println("FADE IN");
 				Gest.reset();
 			}
 
 			if(Gest.gestures == "HL" | Gest.gestures == "L") {
 				adata.fade = true;
-				Serial.println("FADE OUT");
+				if(DEBUG) Serial.println("FADE OUT");
 				Gest.reset();
 			}
 
 			if(Gest.gestures == "TT") {
 				indicator("tt fade", 3);
 				fadeActive = false;
-				delay(100);
+				delay(Gest.tapDelay);
 				Gest.reset();
 			}
 		}
@@ -417,8 +462,7 @@ void Switcher::animSetRegion(int region) {
 	//dimDuration = (dimDuration * 1000);
 
 	animate(adata);
-	Serial.println("SLEEP STOP");
-	indicator("sleep stop", 0);
+	indicator("SLEEP STOP", 0);
 }
 
 int Switcher::getPwmLevel(int intensity) {
@@ -517,150 +561,42 @@ int Switcher::getRegion(int x, int y, bool sloppy = true) {
 	return closestRegion;
 }
 
-// this has it's own loop so take care of updates and resets
-void Switcher::setup() {
-	bool setupDone = false;
-
-	Serial.print("SETUP START");
-
-	indicator("setup start", 2);
-
-	this->setupReset();
-
-	// ignore any previous gesture, setup has it's own loop
-	Gest.reset();
-
-	this->clear();
-	this->toggle(this->numLights);
-
-	while(!setupDone) {
-		Screen.update();
-		Gest.update(Screen.touchX, Screen.touchY, Screen.active);
-		unsigned currentTime = millis();
-
-		if( (this->numLights >= NUM_LIGHTS) | (Gest.gestures == "H") & ((currentTime - Gest.startTime) > 3000) ) {
-			indicator("setup H", 3);
-
-			if(!Gest.active)
-				setupDone = true;
-		}
-		else if( ! Gest.active & (Gest.gestures == "T") ) {
-
-			int r = this->getRegion(Gest.endX, Gest.endY, false);
-
-			Serial.print("got region: ");
-			Serial.println(r);
-
-			if( r < NUM_LIGHTS ) {
-				// region has already been defined so add the new light
-				// to existing region
-				this->lights[this->numLights].region = r;
-			}
-			else {
-				// if region has not been found create new
-				regions[this->numRegions].x = Gest.endX;
-				regions[this->numRegions].y = Gest.endY;
-				// if none of the previous
-				this->lights[this->numLights].region = this->numRegions;
-
-				this->numRegions++;
-			}
-
-			// go to next light
-			this->numLights++;
-			this->clear();
-			this->toggle(this->numLights);
-
-			Gest.reset();
-		}
-		else if( ! Gest.active & (Gest.gestures == "HL") ) {
-			// save light as one of fav
-			Serial.println("Marked as fav");
-			this->lights[this->numLights].fav = true;
-
-			// turn the bit on
-			//this->favData |= 1 << this->numLights;
-
-			Gest.reset();
-		}
-		else if( ! Gest.active & (Gest.gestures == "HR") ) {
-			// don't save the light region, got to the next
-			// this will make the light unaccessable
-			this->numLights++;
-			this->clear();
-			this->toggle(this->numLights);
-
-			Gest.reset();
-		}
-
-		Tlc.update();
-	}
-
-	Serial.print("Number of lights: ");
-	Serial.println(this->numLights);
-
-	Serial.print("Number of regions: ");
-	Serial.println(this->numRegions);
-
-	this->clear();
-
-	Serial.println("SETUP DONE");
-	indicator("setup done", 0);
-	Gest.reset();
-}
-
-void Switcher::setupReset() {
-	this->numLights = 0;
-	this->numRegions = 0;
-
-	this->pinData = 0;
-
-	for(int l = 0; l < NUM_LIGHTS; l++) {
-		this->lights[l].region = NUM_LIGHTS;
-		this->lights[l].intensity = OFF;
-		this->lights[l].fav = false;
-		this->regions[l].x = 0;
-		this->regions[l].y = 0;
-	}
-}
 
 
 // output switch info
-void Switcher::info() {
+void Switcher::regionsInfo() {
 	for(int i = 0; i < numRegions; i++) {
 		// notify the network of the new region
-		char message[30];
-		sprintf(message,"region:%d,x:%d,y:%d;", i, regions[i].x, regions[i].y);
-		Serial.println(message);
-	}
-
-	for(int i = 0; i < numLights; i++) {
-		// notify the network of the new light
-		char message[30];
-		sprintf(message,"light:%d,r:%d,i:%d,f:%d,o:%d;", i, lights[i].region, lights[i].intensity, lights[i].fav,lights[i].on);
+		char message[60];
+		sprintf(message,"API|regions|region:%d|x:%d|y:%d|fav:%d|intensity:%d;", i, regions[i].x, regions[i].y, regions[i].fav,regions[i].intensity);
 		Serial.println(message);
 	}
 }
 
-/*
- * 0 - Red    - Setup
- * 1 - Green  - Set
- * 2 - Blue   -
- * 3 - White  - Dimmer
- * 4 - Yellow - Light selected
- * 5 - Orange -
- * 6 - Cian   - IR
- * 7 - Pink   -
- * 8 - Violet -
- * */
+void Switcher::lightsInfo() {
+	for(int i = 0; i < numLights; i++) {
+		// notify the network of the new light
+		char message[60];
+		sprintf(message,"API|lights|light:%d|region:%d|intensity:%d|fav:%d;", i, lights[i].region, lights[i].intensity, lights[i].fav);
+		Serial.println(message);
+	}
+}
+
+
 void Switcher::indicator(char message[], int color) {
 	indicator(message, color, FULL_ON);
 }
 
+
 void Switcher::indicator(char message[], int color, int intensity) {
 	// full on
-	analogWrite(indicatorPin, 255);
-	Serial.println(message);
+	if( strlen(message) > 0 ) {
+		analogWrite(indicatorPin, 255);
+		Serial.print("INDICATOR : ");
+		Serial.print(message);
+		Serial.print(" : ");
+		Serial.println(color);
+	}
 
 	// reset
 	Tlc.set(13,0);
@@ -682,6 +618,3 @@ void Switcher::indicator(char message[], int color, int intensity) {
 
 	Tlc.update();
 }
-
-
-

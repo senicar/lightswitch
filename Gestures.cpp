@@ -26,7 +26,10 @@ Gestures::Gestures (int nullX = 0, int nullY = 0) {
 	this->lastUpdateTime = 0;
 
 	// drag tolerance is basically distance from previous point
+	// that happended in updateInterval
+	//
 	// var distance = (dX * dX) + (dY * dY);
+	//
 	// the bigger the resolution and smaller the screen, the bigger
 	// dragTolerance should be
 	this->dragTolerance = 3000;
@@ -49,10 +52,10 @@ void Gestures::update(int x = 0, int y = 0, bool active = false) {
 	}
 
 	unsigned currTime = millis();
-	Serial.println(currTime);
-	Serial.println(this->lastUpdateTime);
-	Serial.println(this->updateInterval);
-	Serial.println(currTime - this->lastUpdateTime);
+	//Serial.println(currTime);
+	//Serial.println(this->lastUpdateTime);
+	//Serial.println(this->updateInterval);
+	//Serial.println(currTime - this->lastUpdateTime);
 	if( ( this->active & ((currTime - this->lastUpdateTime) < this->updateInterval) ) ) {
 		// if not enough time has past exit
 		return;
@@ -137,7 +140,6 @@ void Gestures::end() {
 
 	// so that the next time it will run right trough it
 	this->lastUpdateTime = this->updateInterval;
-	Serial.println(this->gestureTime);
 
 	Serial.println("END GESTURES");
 }
@@ -152,7 +154,7 @@ String Gestures::updateGestures() {
 			& (this->gestures == "" | this->gestures == "T" | this->gestures == "TT")
 			) {
 		currentDirection = "T";
-		Serial.print("currentDirection: ");
+		Serial.print("Gesture : ");
 		Serial.println(currentDirection);
 		return currentDirection;
 	}
@@ -162,7 +164,7 @@ String Gestures::updateGestures() {
 	if ( (this->gestures == "")
 			& ((currentTime - this->startTime) > this->tapDelay) ) {
 		currentDirection = "H";
-		Serial.print("currentDirection: ");
+		Serial.print("Gesture : ");
 		Serial.println(currentDirection);
 		return currentDirection;
 	}
@@ -226,12 +228,16 @@ String Gestures::updateGestures() {
 			currentDirection = "U";
 		}
 
-		Serial.print("Gesture currentDirection: ");
-		Serial.println(currentDirection);
+		if(DEBUG) Serial.print("Gesture currentDirection: ");
+		if(DEBUG) Serial.println(currentDirection);
 
 		if( currentDirection != this->lastDirection ) {
 			this->lastDirection = currentDirection;
 			this->lastDirectionSteps = 1;
+
+			Serial.print("Gesture : ");
+			Serial.println(gestures + currentDirection);
+
 			return currentDirection;
 		}
 		else if ( currentDirection == this->lastDirection ) {
@@ -250,22 +256,23 @@ String Gestures::updateGestures() {
 }
 
 void Gestures::reset() {
-	Serial.print("Gesture: ");
+	Serial.print("Gesture : ");
 	Serial.println(gestures);
 
-	Serial.print("Gesture Time: ");
-	Serial.println(gestureTime);
+	if(DEBUG) Serial.print("Gesture Time : ");
+	if(DEBUG) Serial.println(gestureTime);
 
-	Serial.print("Gesture lastDirectionSteps: ");
-	Serial.println(lastDirectionSteps);
+	if(DEBUG) Serial.print("Gesture lastDirectionSteps : ");
+	if(DEBUG) Serial.println(lastDirectionSteps);
 
-	Serial.print("Gesture X: ");
-	Serial.print(endX);
+	if(DEBUG) Serial.print("Gesture X : ");
+	if(DEBUG) Serial.print(endX);
 
-	Serial.print(" - Y: ");
-	Serial.println(endY);
+	if(DEBUG) Serial.print(" - Y : ");
+	if(DEBUG) Serial.println(endY);
 
 	gestures = "";
 	startTime = endTime;
+	active = false;
 }
 

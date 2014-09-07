@@ -4,6 +4,8 @@
 #define NUM_LIGHTS 12
 #endif
 
+#define DEBUG false
+
 #ifndef Switcher_h
 #define Switcher_h
 
@@ -20,13 +22,16 @@ class Switcher {
 			int intensity;
 			int pwm;
 			bool fav;
-			bool on;
 		};
 
 		struct region {
-			region() : x(-1024), y(-1024) {};
+			region() : x(-1024), y(-1024), intensity(0), fav(false) {};
 			int x;
 			int y;
+			int intensity;
+			int pwm;
+			unsigned long irCode;
+			bool fav;
 		};
 
 	public:
@@ -39,7 +44,7 @@ class Switcher {
 		{
 			numLights = 0;
 			numRegions = 0;
-			regionTolerance = 100;
+			regionTolerance = 100; // this makes a region size 50% left and 50% right, up and down from the point
 			pinData = 0;
 			indicatorPin = 6;
  			animBufferNum = NUMITEMS(animBuffer);
@@ -66,11 +71,20 @@ class Switcher {
 		light lights[NUM_LIGHTS];
 		region regions[NUM_LIGHTS];
 
+		// ir actions
+		unsigned long irFavCode;
+		unsigned long irToggleCode;
+
+		// maximum 2 buffers are available
 		anim animBuffer[2];
 
 		char animBufferNum;
 		int pwmNum;
 		int getPwmLevel(int intensity);
+
+		// used when external factors of lightness need to be taken into account
+		// for example sudden light change can be indicator of switch or sun rays
+		unsigned long lastTimeSwitched;
 
 		void setup();
 		void setupReset();
@@ -85,6 +99,8 @@ class Switcher {
 
 		void favOn();
 		void favOff();
+		void favToggle();
+		bool favState;
 
 		void allOn();
 		void allOff();
@@ -127,7 +143,8 @@ class Switcher {
 
 		uint16_t state;
 
-		void info();
+		void regionsInfo();
+		void lightsInfo();
 };
 
 #endif

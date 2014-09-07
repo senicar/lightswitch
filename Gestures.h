@@ -1,6 +1,8 @@
 #ifndef Gestures_h
 #define Gestures_h
 
+#define DEBUG false
+
 #include "Arduino.h"
 #include "math.h"
 
