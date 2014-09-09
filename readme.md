@@ -7,7 +7,7 @@ LightSwitch
 >
 > Proceed with caution.
 
-This project is based on Arduino platform. However the code is written for the Teensy2.0++ since it has certain functions Arduino UNO does not. Most notably, number of TIMERS. It can also be used with all the functionality with Arduino Mega, but some parts of code need to be modified accordingly.
+This project is based on Arduino platform. However the code is written for the Teensy2.0++ since it has certain functions Arduino UNO does not. Most notably, number of TIMERS. It can also be used with Arduino Mega, but some parts of code need to be modified accordingly.
 
 TLC5940 needs two timers and IR needs one, IR cannot be used with Arduino Uno since it has only one timer. Use teensy 2.0++, arduino mega or other arduino compatible board that has three timers. If IR is not needed all reference to it should be removed and the code could be used on Arduino UNO.
 
