@@ -3,14 +3,6 @@
 #define DEBUG false
 
 #include "Tlc5940.h"
-//#include "math.h"
-//#include "Timer.h"
-
-
-/*#include "Functions.h"*/
-
-/*#include "API.h"*/
-
 
 #include "TouchDS.h"
 #include "Gestures.h"
@@ -155,14 +147,16 @@ void Network::update() {
 		light = l.toInt();
 		intensity = i.toInt();
 
-		Serial.print("command: ");
-		Serial.println(command);
+		if(DEBUG) {
+			Serial.print("command: ");
+			Serial.println(command);
 
-		Serial.print("light: ");
-		Serial.println(light);
+			Serial.print("light: ");
+			Serial.println(light);
 
-		Serial.print("intesity: ");
-		Serial.println(intensity);
+			Serial.print("intesity: ");
+			Serial.println(intensity);
+		}
 
 		Serial.print("Full message: ");
 		Serial.println(message);
@@ -216,6 +210,11 @@ bool Network::process() {
 		return true;
 	}
 
+	if(command == "favToggle") {
+		Switch.favToggle();
+		return true;
+	}
+
 	if(command == "allOn") {
 		Switch.allOn();
 		return true;
@@ -227,8 +226,38 @@ bool Network::process() {
 		return true;
 	}
 
+	if(command == "toggleRegion") {
+		Serial.print("toggle region : ");
+		Serial.println(light);
+		Switch.toggleRegion(light);
+		return true;
+	}
+
+	if(command == "dimRegion") {
+		Serial.print("dim region : ");
+		Serial.println(light);
+		Switch.dimRegion(light, intensity);
+		return true;
+	}
+
 	if(command == "indicator") {
 		Switch.indicator("network indicator", light);
+		return true;
+	}
+
+	if(command == "requestUpdateRegions") {
+		Serial.print("API|updateRegions|");
+		Serial.println(Switch.numRegions);
+		delay(100);
+		Switch.regionsInfo();
+		return true;
+	}
+
+	if(command == "requestUpdateLights") {
+		Serial.print("API|updateLights|");
+		Serial.println(Switch.numLights);
+		delay(100);
+		Switch.lightsInfo();
 		return true;
 	}
 
@@ -250,6 +279,8 @@ bool Network::process() {
 		return true;
 	}
 
+	Serial.println("API|commandNotFound|");
+
 	return false;
 }
 
@@ -264,7 +295,6 @@ void Network::reset() {
 ** INIT INTERFACES
 ** -------------------------------------------------------*/
 
-// Initiate interfaces
 TouchDS Screen (x1,x2,y1,y2);
 Gestures Gest (nullX,nullY);
 Switcher Switch(Screen,Gest,Tlc);
@@ -464,50 +494,8 @@ void loop()
 			gestureRecognized = true;
 		}
 
-		// EXTRA Actions
-
-		/*if(digitalRead(button2) == HIGH) {*/
-			// Sleep on region
-			/*if( Gest.gestures == "TTT" ) {*/
-				/*int r = Switch.getRegion(Gest.endX, Gest.endY);*/
-				/*Switch.animSetRegion(r);*/
-				/*gestureRecognized = true;*/
-			/*}*/
-
-			/*if( Gest.gestures == "HUD" ) {*/
-				/*systemInfo();*/
-			/*}*/
-
-			/*if( Gest.gestures == "HDL" | Gest.gestures == "DL" ) {*/
-				/*Serial.println("HDL");*/
-				/*Switch.clear();*/
-				/*gestureRecognized = true;*/
-			/*}*/
-
-			/*if( Gest.gestures == "HUR" | Gest.gestures == "UR" ) {*/
-				/*Switch.allOn();*/
-				/*gestureRecognized = true;*/
-			/*}*/
-
-			/*if( Gest.gestures == "HLDR" | Gest.gestures == "LDR" ) {*/
-				/*lightSensorCalibrate();*/
-				/*gestureRecognized = true;*/
-			/*}*/
-
-			/*if( Gest.gestures == "HDRUL" | Gest.gestures == "DRUL" ) {*/
-				/*Serial.println("RGB indi START");*/
-				/*rgbIndi();*/
-				/*gestureRecognized = true;*/
-			/*}*/
-		/*}*/
-
 		// Toggle default gesture
-
-		if(
-			! gestureRecognized ||
-			Gest.gestures == "H"
-			) {
-
+		if( ! gestureRecognized || Gest.gestures == "H") {
 			Serial.println("Trigger : favToggle");
 			Switch.favToggle();
 		}
@@ -787,13 +775,24 @@ void defaultLightsGrid(int rows=4, int columns=4) {
 	Switch.lights[5].fav = true;
 	Switch.lights[6].fav = true;
 
+	Switch.regions[5].hasFav = true;
+	Switch.regions[6].hasFav = true;
+
 	if( rows == 4 ) {
 		Switch.lights[9].fav = true;
 		Switch.lights[10].fav = true;
+
+		Switch.regions[9].hasFav = true;
+		Switch.regions[10].hasFav = true;
 	}
 
 	Switch.numLights = NUM_LIGHTS;
 	Switch.numRegions = NUM_LIGHTS;
+
+	Serial.print("API|updateRegions|");
+	Serial.println(Switch.numRegions);
+	Serial.print("API|updateLights");
+	Serial.println(Switch.numLights);
 }
 
 void defaultLightsGrid12() {
@@ -997,6 +996,9 @@ void debug_end() {
 void switchSetup() {
 	bool setupLights = false;
 
+	Serial.println("API|setupStart|");
+	delay(500);
+
 	switchSetupReset();
 
 	// ignore any previous gesture, setup has it's own loop
@@ -1084,6 +1086,10 @@ void switchSetup() {
 		else if( ! Gest.active & (Gest.gestures == "HL" | Gest.gestures == "L") & (timeDiff > Gest.tapDelay) ) {
 			// save light as one of fav
 			Switch.lights[Switch.numLights].fav = true;
+
+			// mark region as has favs
+			Switch.regions[ Switch.lights[Switch.numLights].region ].hasFav = true;
+
 			Gest.reset();
 
 			Switch.indicator("Setup : marked as FAV", 5);
@@ -1183,8 +1189,16 @@ void switchSetup() {
 
 	// WE ARE DONE
 
+	Serial.println("API|setupDone|");
+
+	Serial.print("API|updateRegions|");
+	Serial.println(Switch.numRegions);
+	Serial.print("API|updateLights|");
+	Serial.println(Switch.numLights);
+
 	Serial.print("Setup : Number of lights : ");
 	Serial.println(Switch.numLights);
+
 	Switch.regionsInfo();
 
 	Serial.print("Setup : Number of regions : ");

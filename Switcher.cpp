@@ -82,12 +82,16 @@ void Switcher::favOff() {
 }
 
 void Switcher::favOn() {
+	bool favFound = false;
 	for(int l=0; l < this->numLights; l++) {
 		if(this->lights[l].fav) {
 			if(DEBUG) Serial.println("FAV ON");
 			this->dim(l,FULL_ON);
+			favFound = true;
 		}
 	}
+
+	if(!favFound) allOn();
 
 	favState = true;
 }
@@ -205,6 +209,9 @@ void Switcher::dim(int l, int intensity, unsigned dur) {
 	}
 
 	lastTimeSwitched = millis();
+
+	lightInfo(l);
+	updateRegion(lights[l].region);
 }
 
 void Switcher::dimmer(int r) {
@@ -264,6 +271,7 @@ void Switcher::dimmer(int r) {
 
 	indicator("DIMMER STOP", 0);
 }
+
 
 void Switcher::animate(anim adata) {
 	// only two buffers
@@ -534,6 +542,8 @@ int Switcher::getRegion(int x, int y, bool sloppy = true) {
 		long dy = (Y-y);
 		unsigned long distance = (dx * dx) + (dy * dy);
 
+		// TODO :  we probably could use abs() here to get the min distance
+
 		if(
 			(X != 0) & (Y != 0)
 			& (X > (x - this->regionTolerance))
@@ -562,23 +572,56 @@ int Switcher::getRegion(int x, int y, bool sloppy = true) {
 }
 
 
+void Switcher::updateRegion( int r ) {
+	if( r >= numRegions ) return;
+
+	// check if any light in region is active
+	int brightest = 0;
+
+	// we assume its off
+	regions[r].intensity = brightest;
+
+	for(int l = 0; l < numLights; l++) {
+		// set the brightest light
+		if( lights[l].region == r & lights[l].intensity > brightest ) {
+			brightest = lights[l].intensity;
+			regions[r].intensity = brightest;
+		}
+	}
+
+	// send the update
+	regionInfo(r);
+}
+
+void Switcher::updateRegions() {
+	for(int r = 0; r < numRegions; r++) {
+		updateRegion(r);
+	}
+}
 
 // output switch info
+
+void Switcher::regionInfo( int i ) {
+	char message[70];
+	sprintf(message,"API|regionInfo|region:%d|x:%d|y:%d|intensity:%d|fav:%d|hasFav:%d|", i, regions[i].x, regions[i].y,regions[i].intensity, regions[i].fav, regions[i].hasFav);
+	Serial.println(message);
+}
+
 void Switcher::regionsInfo() {
 	for(int i = 0; i < numRegions; i++) {
-		// notify the network of the new region
-		char message[60];
-		sprintf(message,"API|regions|region:%d|x:%d|y:%d|fav:%d|intensity:%d;", i, regions[i].x, regions[i].y, regions[i].fav,regions[i].intensity);
-		Serial.println(message);
+		regionInfo(i);
 	}
+}
+
+void Switcher::lightInfo( int i ) {
+	char message[60];
+	sprintf(message,"API|lightInfo|light:%d|region:%d|intensity:%d|fav:%d|", i, lights[i].region, lights[i].intensity, lights[i].fav);
+	Serial.println(message);
 }
 
 void Switcher::lightsInfo() {
 	for(int i = 0; i < numLights; i++) {
-		// notify the network of the new light
-		char message[60];
-		sprintf(message,"API|lights|light:%d|region:%d|intensity:%d|fav:%d;", i, lights[i].region, lights[i].intensity, lights[i].fav);
-		Serial.println(message);
+		lightInfo(i);
 	}
 }
 

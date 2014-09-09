@@ -32,6 +32,7 @@ class Switcher {
 			int pwm;
 			unsigned long irCode;
 			bool fav;
+			bool hasFav;
 		};
 
 	public:
@@ -110,6 +111,8 @@ class Switcher {
 		void turnOnRegion(int region);
 		void dimRegion(int region, int intensity);
 		void dimRegion(int region, int intensity, unsigned dimDuration);
+		void updateRegion(int region);
+		void updateRegions();
 
 		void clear();
 		void setAll(int intensity);
@@ -143,7 +146,10 @@ class Switcher {
 
 		uint16_t state;
 
+		void regionInfo( int i );
 		void regionsInfo();
+
+		void lightInfo( int i );
 		void lightsInfo();
 };
 
