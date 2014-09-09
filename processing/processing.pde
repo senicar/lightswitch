@@ -7,10 +7,12 @@ String apiMsg;  // Input string from serial port
 int lf = 10;      // ASCII linefeed
 
 // radius around the point
-int regionTolerance = 50;
+int regionTolerance = 75;
 
-int screenX = 600;
-int screenY = 450;
+int screenX = 800;
+int screenY = 600;
+
+int sidebarWidth = 200;
 
 // when we receive information about active setup mode disable refreshing
 boolean switchInSetupMode = false;
@@ -42,9 +44,11 @@ long luckyUpdate = 0;
 void initLocalButtons() {
   // all local buttons should have ID > 1000
   int row_baseline = (1024/3)/2;
-  regions.add(new Region(1001,screenX + 555,row_baseline,0,0,"Toggle FAV",0));
-  regions.add(new Region(1002,screenX + 555,row_baseline*3,0,0,"ON/OFF",0));
-  regions.add(new Region(1003,screenX + 555,row_baseline*5,0,0,"?",0));
+  int col_baseline = (1024/4)/2;
+  regions.add(new Region(1001,screenX + sidebarWidth + 155,row_baseline,0,0,"Toggle FAV",0));
+  regions.add(new Region(1002,screenX + sidebarWidth + 155,row_baseline*3,0,0,"ON/OFF",0));
+  regions.add(new Region(1003,screenX + sidebarWidth + 155,row_baseline*5,0,0,"?",0));
+  regions.add(new Region(1004,screenX + sidebarWidth + 25,(row_baseline*6)-10,0,0,"Reset",0, 80,60));
 }
 
 void setup() {
@@ -90,8 +94,8 @@ void setup() {
   
   initLocalButtons();
   
-  // we add 150 for local buttons
-  size(screenX + 150,screenY);
+  // we add for local buttons
+  size(screenX + sidebarWidth,screenY);
   
   // List all the available serial ports:
   println(Serial.list());
@@ -169,6 +173,12 @@ void draw() {
             region.selected = true;
             luckyTime = millis();
           }
+          continue;
+        }
+        
+        // reset
+        if(region.id == 1004) {
+          myPort.write("reset::;");
           continue;
         }
         
@@ -393,7 +403,14 @@ void serialEvent(Serial p) {
     int regionIntensity = int(split(data[5], ":")[1]);
     int regionFav = int(split(data[6], ":")[1]);
     int regionHasFav = int(split(data[7], ":")[1]);
-  
+    String regionIrCode = trim(split(data[8], ":")[1]);
+    
+    String regionLabel = str(regionID);
+    if(regionHasFav > 0) regionLabel = regionLabel + "\nfav";
+    if(regionIrCode.length() > 2) {
+      regionLabel = regionLabel +"\n"+ regionIrCode;
+    }
+  println(regionIrCode);
     if(regions != null) {
       
         boolean regionNotFound = true;
@@ -405,6 +422,10 @@ void serialEvent(Serial p) {
             //println(region.id);
             region.intensity = regionIntensity;
             region.hasFav = regionHasFav;
+            region.label = regionLabel;
+            
+            region.x = int(map(regionX, 0, 1024, 0, screenX));
+            region.y = int(map(regionY, 0, 1024, 0, screenY));
             return;
           }
        }
@@ -412,7 +433,7 @@ void serialEvent(Serial p) {
        if(regionNotFound) {
           // new region detected
           println("GUI : REGION ADD : " + regionID);
-          regions.add(new Region(regionID,regionX,regionY,regionIntensity,regionFav,"",regionHasFav));
+          regions.add(new Region(regionID,regionX,regionY,regionIntensity,regionFav,regionLabel,regionHasFav));
        }
        
        for( int r = 0; r < regions.size(); r++ ) {
@@ -489,6 +510,8 @@ class Region {
   int hasFav;
   boolean selected = false;
   String label = "";
+  int w = regionTolerance*2;
+  int h = regionTolerance*2;
   
   // constructor
   Region(int idUpdate, int xUpdate, int yUpdate, int intensityUpdate, int favUpdate) {
@@ -499,6 +522,18 @@ class Region {
     fav = favUpdate;
   }
   
+  Region(int idUpdate, int xUpdate, int yUpdate, int intensityUpdate, int favUpdate, String labelUpdate, int hasFavUpdate, int wUpdate, int hUpdate) {
+    id = idUpdate;
+    x = int(map(xUpdate, 0, 1024, 0, screenX));
+    y = int(map(yUpdate, 0, 1024, 0, screenY));
+    intensity = intensityUpdate;
+    fav = favUpdate;
+    label = labelUpdate;
+    hasFav = hasFavUpdate;
+    w = wUpdate;
+    h = hUpdate;
+  }
+  
   Region(int idUpdate, int xUpdate, int yUpdate, int intensityUpdate, int favUpdate, String labelUpdate, int hasFavUpdate) {
     id = idUpdate;
     x = int(map(xUpdate, 0, 1024, 0, screenX));
@@ -507,7 +542,6 @@ class Region {
     fav = favUpdate;
     label = labelUpdate;
     hasFav = hasFavUpdate;
-    println(label);
   }
   
   // Custom method for drawing the object
@@ -515,10 +549,6 @@ class Region {
      strokeWeight(2);
      stroke(75);
      fill(25,25,25);
-     
-     if(hasFav > 0) {
-       label = "FAV";
-     }
      
      float brightness = map(intensity, 0, 4095, 100, 255);
 
@@ -531,7 +561,7 @@ class Region {
        fill(brightness,0,brightness);
      }
      
-     ellipse(x, y, regionTolerance*2, regionTolerance*2);
+     ellipse(x, y, w, h);
           
      if(label.length() > 0) {
        if(intensity > 2000)
@@ -540,7 +570,7 @@ class Region {
          fill(200,200,200);
          
        textAlign(CENTER);
-       textSize(15);
+       textSize(18);
        text(label, x, y+4);
      }
 

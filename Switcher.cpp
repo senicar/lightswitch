@@ -602,8 +602,8 @@ void Switcher::updateRegions() {
 // output switch info
 
 void Switcher::regionInfo( int i ) {
-	char message[70];
-	sprintf(message,"API|regionInfo|region:%d|x:%d|y:%d|intensity:%d|fav:%d|hasFav:%d|", i, regions[i].x, regions[i].y,regions[i].intensity, regions[i].fav, regions[i].hasFav);
+	char message[90];
+	sprintf(message,"API|regionInfo|region:%d|x:%d|y:%d|intensity:%d|fav:%d|hasFav:%d|irCode:%10X|", i, regions[i].x, regions[i].y,regions[i].intensity, regions[i].fav, regions[i].hasFav, regions[i].irCode);
 	Serial.println(message);
 }
 

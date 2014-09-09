@@ -271,6 +271,13 @@ bool Network::process() {
 		return true;
 	}
 
+	if(command == "reset") {
+		defaultLightsGrid12();
+		Switch.regionsInfo();
+		Switch.lightsInfo();
+		return true;
+	}
+
 	if(command == "info") {
 		Serial.print("freeRam: ");
 		Serial.println(freeRam());
@@ -753,6 +760,9 @@ void defaultLightsGrid(int rows=4, int columns=4) {
 	int light = 0;
 
 	int py = ry/2;
+
+	switchSetupReset();
+
 	for(int r = rows; r > 0; r--) {
 		int px = rx/2;
 		for(int c = columns; c > 0; c--) {
@@ -1011,6 +1021,8 @@ void switchSetup() {
 	**  Setup individual light, set favs, regions, ir code ...
 	** -------------------------------------------------------*/
 
+	boolean regionHasBeenDefined = false;
+
 	while(!setupLights) {
 		Switch.indicator("", 2);
 
@@ -1025,9 +1037,17 @@ void switchSetup() {
 		if(irrecv.decode(&ir_results) & ir_results.value < 4294967295) {
 			Serial.println(ir_results.value, HEX);
 
-			Switch.regions[ Switch.numRegions ].irCode = ir_results.value;
+			int r = Switch.getRegion(Gest.endX, Gest.endY, false);
+			// only if region exists
+			if(regionHasBeenDefined) {
+				Switch.regions[ Switch.numRegions ].irCode = ir_results.value;
+				Switch.regionInfo(Switch.numRegions);
+				Switch.indicator("Setup : ir code set", 7);
+			}
+			else {
+				Switch.indicator("Setup : ir code region not defined", 7);
+			}
 
-			Switch.indicator("Setup : ir code set", 7);
 			delay(Gest.tapDelay);
 			Switch.indicator("", 0);
 
@@ -1047,7 +1067,13 @@ void switchSetup() {
 		else if( ! Gest.active & (Gest.gestures == "TT") & (timeDiff > Gest.tapDelay) ) {
 			// don't save the light region, got to the next
 			// this will make the light unaccessable
+			Switch.lightInfo(Switch.numLights);
 			Switch.numLights++;
+
+			Switch.regionInfo(Switch.numRegions);
+			if(regionHasBeenDefined) Switch.numRegions++;
+			regionHasBeenDefined = false;
+
 			Switch.clear();
 			Switch.toggle(Switch.numLights);
 
@@ -1067,14 +1093,15 @@ void switchSetup() {
 			//
 			// else create a new region and assign it to the light
 			if( r < Switch.numLights ) {
-				Switch.lights[Switch.numLights].region = r;
+				Switch.lights[r].region = r;
+				Switch.regionInfo(r);
 			}
 			else {
 				Switch.regions[Switch.numRegions].x = Gest.endX;
 				Switch.regions[Switch.numRegions].y = Gest.endY;
 				Switch.lights[Switch.numLights].region = Switch.numRegions;
-
-				Switch.numRegions++;
+				Switch.regionInfo(Switch.numRegions);
+				regionHasBeenDefined = true;
 			}
 
 			Switch.indicator("Setup : region set", 1);
@@ -1088,11 +1115,15 @@ void switchSetup() {
 			Switch.lights[Switch.numLights].fav = true;
 
 			// mark region as has favs
-			Switch.regions[ Switch.lights[Switch.numLights].region ].hasFav = true;
+			if( regionHasBeenDefined ) {
+				Switch.regions[ Switch.numRegions ].hasFav = true;
+				Switch.regionInfo(Switch.numRegions);
+				Switch.indicator("Setup : marked FAV region", 5);
+			}
 
 			Gest.reset();
 
-			Switch.indicator("Setup : marked as FAV", 5);
+			Switch.indicator("Setup : marked FAV light", 5);
 			delay(Gest.tapDelay);
 			Switch.indicator("", 0);
 
@@ -1231,6 +1262,7 @@ void switchSetupReset() {
 		Switch.regions[l].x = 0;
 		Switch.regions[l].y = 0;
 		Switch.regions[l].fav = false;
+		Switch.regions[l].hasFav = false;
 		Switch.regions[l].intensity = 0;
 		Switch.regions[l].pwm = 0;
 		Switch.regions[l].irCode = 0;
