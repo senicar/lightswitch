@@ -15,17 +15,20 @@
 #include "Gestures.h"
 
 class Switcher {
-	private:
+	public:
 		struct light {
-			light() : intensity(0), region(NUM_LIGHTS), fav(false) {};
+			light() : intensity(0), region(NUM_LIGHTS), fav(false), id(NUM_LIGHTS) {};
+			int id; // not fully implemented, don't use it
 			int region;
 			int intensity;
 			int pwm;
 			bool fav;
+			unsigned long irCode;
 		};
 
 		struct region {
-			region() : x(-1024), y(-1024), intensity(0), fav(false) {};
+			region() : x(-1024), y(-1024), intensity(0), fav(false), id(NUM_LIGHTS) {};
+			int id; // not fully implemented, don't use it
 			int x;
 			int y;
 			int intensity;
@@ -35,7 +38,6 @@ class Switcher {
 			bool hasFav;
 		};
 
-	public:
 		TouchDS & Screen;
 		Gestures & Gest;
 		Tlc5940 & Tlc;
@@ -151,6 +153,8 @@ class Switcher {
 
 		void lightInfo( int i );
 		void lightsInfo();
+
+		bool inSetupMode;
 };
 
 #endif

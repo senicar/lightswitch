@@ -601,9 +601,24 @@ void Switcher::updateRegions() {
 
 // output switch info
 
-void Switcher::regionInfo( int i ) {
-	char message[90];
-	sprintf(message,"API|regionInfo|region:%d|x:%d|y:%d|intensity:%d|fav:%d|hasFav:%d|irCode:%10X|", i, regions[i].x, regions[i].y,regions[i].intensity, regions[i].fav, regions[i].hasFav, regions[i].irCode);
+void Switcher::regionInfo( int r ) {
+	char message[100];
+	int numRegionLights = 0;
+	bool hasFav = false;
+
+	// always check all possible lights
+	for(int i=0; i < NUM_LIGHTS; i++) {
+		if(lights[i].region == r) {
+			numRegionLights = numRegionLights + 1;
+
+			if(lights[i].fav)
+				hasFav = true;
+		}
+	}
+
+	regions[r].hasFav = hasFav;
+
+	sprintf(message,"API|regionInfo|region:%d|x:%d|y:%d|intensity:%d|lights:%d|fav:%d|hasFav:%d|irCode:%10X|", r, regions[r].x, regions[r].y,regions[r].intensity, numRegionLights, regions[r].fav, regions[r].hasFav, regions[r].irCode);
 	Serial.println(message);
 }
 

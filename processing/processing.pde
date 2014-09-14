@@ -45,52 +45,18 @@ void initLocalButtons() {
   // all local buttons should have ID > 1000
   int row_baseline = (1024/3)/2;
   int col_baseline = (1024/4)/2;
-  regions.add(new Region(1001,screenX + sidebarWidth + 155,row_baseline,0,0,"Toggle FAV",0));
-  regions.add(new Region(1002,screenX + sidebarWidth + 155,row_baseline*3,0,0,"ON/OFF",0));
-  regions.add(new Region(1003,screenX + sidebarWidth + 155,row_baseline*5,0,0,"?",0));
-  regions.add(new Region(1004,screenX + sidebarWidth + 25,(row_baseline*6)-10,0,0,"Reset",0, 80,60));
+  regions.add(new Region(1001,screenX + sidebarWidth + 155,row_baseline,0,0,"\u2665",0,100,100));
+  regions.add(new Region(1002,screenX + sidebarWidth + 155,row_baseline*3,0,0,"\u263C",0,100,100));
+  regions.add(new Region(1003,screenX + sidebarWidth + 155,row_baseline*5,0,0,"?",0, 100,100));
+  regions.add(new Region(1004,screenX + sidebarWidth + 155,(row_baseline*6)-10,0,0,"reset",0, 80,40));
 }
 
 void setup() {
-  // first we have to initialize default regions
-  // default 3/4 grid
-  /*
-  int columns = 4;
-  int rows = 3;
-  int rx = screenX / columns;
-  int ry = screenY / rows;
-  int light = 0;
-  int py = ry/2;
-  
-  regions = new Region[columns*rows];
-  lights = new Light[columns*rows];
-  
-  for(int r = rows; r > 0; r--) {
-    int px = rx/2;
-    for(int c = columns; c > 0; c--) {
-      print("set light number: ");
-      println(light);
-      
-      if(light == 4)
-        regions[light] = new Region(light, px, py, pwm[2], 0);
-      else if(light == 7)
-        regions[light] = new Region(light, px, py, pwm[15], 0);
-      else
-        regions[light] = new Region(px, py, 0, 0);
-      lights[light] = new Light(light, 0, 0);
-
-      px += rx;
-
-      if(light < 12)
-        light++;
-    }
-
-    py += ry;
-  }
-  */
-  
   // init regions
   // regions = new ArrayList<Region>();
+  PFont fontFamily;
+  fontFamily = loadFont("DejaVuSans-Bold-48.vlw");
+  textFont(fontFamily);
   
   initLocalButtons();
   
@@ -113,14 +79,19 @@ void setup() {
  
 void draw() {
   background(0);
-  stroke(125);
+  stroke(75);
   line(screenX, 0, screenX, screenY);
   
-  // check if any light on
+  regions.get(0).selected = false;
+  // check if any light on on region.id = 1002
   regions.get(1).intensity = 0;
+  regions.get(1).selected = false;
+  regions.get(1).label = "\u263C";
   for(int l = 0; l < lights.size(); l++) {
     if(lights.get(l).intensity > 0) {
-      regions.get(1).intensity = 4095;
+      //regions.get(1).intensity = 4095;
+      regions.get(1).selected = true;
+      regions.get(1).label = "\u2600";
     }
   }
   
@@ -140,13 +111,15 @@ void draw() {
         // fav
         if(region.id == 1001) {
           myPort.write("favToggle::;");
+          region.selected = true;
+          region.draw();
           continue;
         }
         
         // on/off
         if(region.id == 1002) {
           println("GUI : on/off : "+ region.intensity);
-          if(region.intensity > 0)
+          if(region.intensity > 0 | region.selected)
             myPort.write("allOff::;");
           else
             myPort.write("allOn::;");
@@ -155,9 +128,8 @@ void draw() {
         
         // ?
         if(region.id == 1003) {
-          String label1 = "Do You feel lucky";
-          String label2 = "Well do ya, PUNK !?";
-          String label3 = "I DO !!";
+          String label1 = "Do you feel lucky\nwell do ya, punk !?";
+          String label2 = "I DO !!";
           println();
           println();
           if(region.label.equals("?") == true) {
@@ -166,10 +138,6 @@ void draw() {
           }
           else if(region.label.equals(label1) == true) {
             region.label = label2;
-            region.selected = true;
-          }
-          else if(region.label.equals(label2) == true) {
-            region.label = label3;
             region.selected = true;
             luckyTime = millis();
           }
@@ -360,9 +328,11 @@ void mouseDragged(MouseEvent e) {
     Region region = regions.get(r);
     if(region.selected) {
       int _mouseX = int(constrain(mouseX,0,screenX));
+      // wolfram bulb needs more power than led, this mapping returns higher average intensity
+      // than pwm[level] which is better for leds, wolfram buld truns of when intensity < 750
       int intensity = int(map(_mouseX,0,screenX,pwm[0],4095));
       //int level = int(map(_mouseX,0,screenX,0,15));
-      //intensity = pwm[level];
+      //int intensity = pwm[level];
       myPort.write("dimRegion:"+region.id+":"+intensity+";");
      
       refreshedTime = millis();
@@ -401,12 +371,13 @@ void serialEvent(Serial p) {
     int regionX = int(split(data[3], ":")[1]);
     int regionY = int(split(data[4], ":")[1]);
     int regionIntensity = int(split(data[5], ":")[1]);
-    int regionFav = int(split(data[6], ":")[1]);
-    int regionHasFav = int(split(data[7], ":")[1]);
-    String regionIrCode = trim(split(data[8], ":")[1]);
+    int regionNumRegionLights = int(split(data[6], ":")[1]);
+    int regionFav = int(split(data[7], ":")[1]);
+    int regionHasFav = int(split(data[8], ":")[1]);
+    String regionIrCode = trim(split(data[9], ":")[1]);
     
-    String regionLabel = str(regionID);
-    if(regionHasFav > 0) regionLabel = regionLabel + "\nfav";
+    String regionLabel = str(regionID+1) + " ("+ str(regionNumRegionLights) +")";
+    if(regionHasFav > 0) regionLabel = regionLabel + "\n\u2665";
     if(regionIrCode.length() > 2) {
       regionLabel = regionLabel +"\n"+ regionIrCode;
     }
@@ -422,6 +393,7 @@ void serialEvent(Serial p) {
             //println(region.id);
             region.intensity = regionIntensity;
             region.hasFav = regionHasFav;
+            region.numRegionLights = regionNumRegionLights;
             region.label = regionLabel;
             
             region.x = int(map(regionX, 0, 1024, 0, screenX));
@@ -433,7 +405,7 @@ void serialEvent(Serial p) {
        if(regionNotFound) {
           // new region detected
           println("GUI : REGION ADD : " + regionID);
-          regions.add(new Region(regionID,regionX,regionY,regionIntensity,regionFav,regionLabel,regionHasFav));
+          regions.add(new Region(regionID,regionX,regionY,regionIntensity,regionNumRegionLights,regionFav,regionLabel,regionHasFav));
        }
        
        for( int r = 0; r < regions.size(); r++ ) {
@@ -506,6 +478,7 @@ class Region {
   int x;
   int y;
   int intensity;
+  int numRegionLights;
   int fav;
   int hasFav;
   boolean selected = false;
@@ -534,7 +507,7 @@ class Region {
     h = hUpdate;
   }
   
-  Region(int idUpdate, int xUpdate, int yUpdate, int intensityUpdate, int favUpdate, String labelUpdate, int hasFavUpdate) {
+  Region(int idUpdate, int xUpdate, int yUpdate, int intensityUpdate, int numRegionLightsUpdate, int favUpdate, String labelUpdate, int hasFavUpdate) {
     id = idUpdate;
     x = int(map(xUpdate, 0, 1024, 0, screenX));
     y = int(map(yUpdate, 0, 1024, 0, screenY));
@@ -542,36 +515,49 @@ class Region {
     fav = favUpdate;
     label = labelUpdate;
     hasFav = hasFavUpdate;
+    numRegionLights = numRegionLightsUpdate;
   }
   
   // Custom method for drawing the object
    void draw() {
+     strokeWeight(1);
+     stroke(20);
+     fill(15,15,15);
+     //rect(x - (w/2), y-(h/2), w, h, 10);
+     
      strokeWeight(2);
-     stroke(75);
-     fill(25,25,25);
+     stroke(100);
+     fill(45,45,45);
      
      float brightness = map(intensity, 0, 4095, 100, 255);
 
      if( intensity > 0 ) {
        fill(brightness,brightness,0);
-       stroke(200,200,200);
+       stroke(220,220,220);
      }
      
      if(selected) {
        fill(brightness,0,brightness);
      }
      
-     ellipse(x, y, w, h);
+     rect(x - (w/2), y-(h/2), w, h, w/3);
+     //ellipse(x, y, w, h);
           
      if(label.length() > 0) {
-       if(intensity > 2000)
+       if(intensity > 1500)
          fill(0,0,0);
        else
          fill(200,200,200);
          
        textAlign(CENTER);
-       textSize(18);
-       text(label, x, y+4);
+       if(id==1001 || id==1002) {
+         textSize(46);
+         text(label, x, y+14);
+       }
+       else {
+         textSize(18);
+         text(label, x, y+4);
+       }
      }
 
    }
